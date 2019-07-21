@@ -22,7 +22,7 @@ public class DistributTrancInitialiser extends ChannelInitializer<SocketChannel>
         logger.info( "initChannel" + socketChannel.localAddress().getHostName() );
         ChannelPipeline pipeline = socketChannel.pipeline();
         pipeline.addLast( "" , new HttpServerCodec());
-        pipeline.addLast( "TestHttpServerHandler" , new DistributTrancHandler());
+        pipeline.addLast( "DistributTrancHandler" , new DistributTrancHandler());
 
 
 
