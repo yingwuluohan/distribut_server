@@ -53,9 +53,11 @@ DistributTrancServer implements InitializingBean{
             //监听端口
             ChannelFuture channelFuture = serverBootstrap.bind( 8888 ).sync();
             channelFuture.channel().closeFuture().sync();
+            System.out.println( "----------服务端启动完成------------" );
         }catch ( Exception e ){
             e.printStackTrace();
         }finally {
+            System.out.println( "----------服务端关闭--------------" );
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
         }

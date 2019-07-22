@@ -3,6 +3,7 @@ package com.self.transac.distribult_server.handle;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.group.ChannelGroup;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DistributTrancHandler extends ChannelInboundHandlerAdapter {
+public class DistributTrancHandler extends ChannelInboundHandlerAdapter  {
 
 
     private static ChannelGroup channelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE );
@@ -29,10 +30,16 @@ public class DistributTrancHandler extends ChannelInboundHandlerAdapter {
         channelGroup.add( ctx.channel() );
     }
 
-
+    /** 客户端连接服务端时候执行的方法 **/
+    @Override
+    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+        System.out.println( "----------------客户端连接服务端:-------" + ctx.channel().remoteAddress() );
+        super.channelActive( ctx );
+    }
+    /** 读取客户端传递过来的数据 */
     @Override
     public synchronized void channelRead(ChannelHandlerContext ctx , Object msg ){
-        System.out.println( "接收数据：" + msg.toString());
+        System.out.println( "server ------------------接收数据：" + msg.toString());
         JSONObject jsonObject = JSON.parseObject( (String)msg );
         //create 创建事务组 ，add添加事务
         String command = jsonObject.getString( "command" );
@@ -72,23 +79,18 @@ public class DistributTrancHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void sendResult( JSONObject result ){
-//        for(Channel channel :channelGroup ){
-//            System.out.println( "发送数据" );
-//            channel.writeAndFlush( result.toJSONString() );
-//        }
+        for(Channel channel :channelGroup ){
+            System.out.println( "发送数据" );
+            channel.writeAndFlush( result.toJSONString() );
+        }
     }
-    /** 重写父类的所有方法**/
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        System.out.println( "channelActive" );
-        super.channelActive( ctx );
-    }
+
 
     //注册
     @Override
     public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
 
-        System.out.println( "channelRegistered" );
+        System.out.println( "server begin register------------------ channelRegistered" );
         super.channelRegistered( ctx );
     }
     /***/
