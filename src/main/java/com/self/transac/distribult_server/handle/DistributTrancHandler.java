@@ -12,13 +12,12 @@ import io.netty.util.concurrent.GlobalEventExecutor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.*;
 
 //SimpleChannelInboundHandler
 public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
 
-
-    private static ChannelGroup channelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE );
+    private static ChannelGroup  channelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE );
 
     /** 存放 ： */
     private Map< String , List<String >> transactionTypeMap = new ConcurrentHashMap<String, List<String>>();
@@ -43,18 +42,16 @@ public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
     /** 读取客户端传递过来的数据 */
     @Override
     public synchronized void channelRead(ChannelHandlerContext ctx , Object msg ){
-        System.out.println( "server channelRead------------------接收数据1：" + msg.toString());
+        System.out.println( "事务IP:" + ctx.channel().remoteAddress() );
         JSONObject jsonObject = JSON.parseObject( msg.toString() );
-        System.out.println( "server channelRead------------------接收数据2：");
-        //create 创建事务组 ，add添加事务
+        //TODO create 创建事务组 ，add添加事务
         String command = jsonObject.getString( "commond" );
         String groupId = jsonObject.getString( "groupId" );
-        System.out.println( "server channelRead------------------接收数据3");
-        //子事务类型： commit -待提交 ， rollback -待回滚
+        //TODO 子事务类型： commit -待提交 ， rollback -待回滚
         String transactionType = jsonObject.getString( "transactionType" );
-        //事务数量
+        //TODO 事务数量
         Integer transactionCount = jsonObject.getInteger( "transactionCount" );
-        //是否结束事务
+        //TODO 是否结束事务
         Boolean isEnd = jsonObject.getBoolean( "isEnd" );
 
         if( "create".equals( command )){
@@ -70,36 +67,42 @@ public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
             transactionTypeMap.put( groupId , list );
             if ( isEnd ){
                 isEndMap.put( groupId , true );
-                transactionCountMap.put( groupId , transactionCount != null? transactionCount:1 );
+                transactionCountMap.put( groupId , transactionCount != null? transactionCount:0 );
             }
 
             JSONObject result = new JSONObject();
             result.put( "groupId" ,groupId );
             //如果已经接收到事务结束事务的标记，比较事务是否已经全部到达 ，如果已经全部到达看是否需要回滚
-            System.out.println( "isEndMap.get( groupId ):"+ isEndMap.get(groupId ));
-            System.out.println( "transactionCountMap.get( groupId ):"+ transactionCountMap.get( groupId ));
-            System.out.println( "transactionTypeMap.get( groupId).size():"+ list.size());
-            System.out.println( "transactionTypeMap.get( groupId):"+ list );
+            System.out.println( "-------事务已提交的数量-----："+transactionCountMap.get( groupId ) );
+            System.out.println( "-------事务的数量----："+list.size() );
 
-            if( isEndMap.get( groupId ) ){
-
-//                    &&transactionCountMap.get( groupId ).equals( list.size())){
+            if( isEndMap.get( groupId ) &&transactionCountMap.get( groupId ).equals( list.size()) ){
                 if( list.contains( "rollback" )){
                     result.put( "command" ,"rollback" );
+                    sendResult( result , null );
                 }else{
+
                     result.put( "command" ,"commit" );
+                    sendResult( result ,ctx.channel() );
                 }
-                sendResult( result );
+
             }
-            System.out.println( "回滚数据是--------------：" + result );
+            System.out.println( "事务IP:" + ctx.channel().remoteAddress() + ",数据是--------------：" + result );
         }
     }
-    private void sendResult( JSONObject result ){
-        System.out.println( "回滚channelGroup是--------------：" + channelGroup );
-        for(Channel channel :channelGroup ){
-            System.out.println( "发送数据" );
+    private void sendResult( JSONObject result ,Channel channel ){
+        System.out.println( "channelGroup是--------------：" + channelGroup );
+
+        if( null != channel ){
             channel.writeAndFlush( result.toJSONString() );
+        }else{
+            for(Channel channelClients :channelGroup ){
+                System.out.println( "rollback事务当前客户端连接是:" +channelClients.remoteAddress() );
+                channelClients.writeAndFlush( result.toJSONString() );
+            }
         }
+
+
     }
     @Override
     public boolean acceptInboundMessage( Object msg) throws  Exception{
