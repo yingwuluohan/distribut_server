@@ -3,9 +3,8 @@ package com.self.transac.distribult_server.handle;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -15,14 +14,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class DistributTrancHandler extends ChannelInboundHandlerAdapter  {
+//SimpleChannelInboundHandler
+public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
 
 
     private static ChannelGroup channelGroup = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE );
 
+    /** 存放 ： */
     private Map< String , List<String >> transactionTypeMap = new ConcurrentHashMap<String, List<String>>();
     private Map<String , Boolean > isEndMap = new ConcurrentHashMap<>();
+    /** 存放： */
     private Map<String , Integer > transactionCountMap = new ConcurrentHashMap<>();
+
+
 
     @Override
     public void handlerAdded( ChannelHandlerContext ctx ){
@@ -39,11 +43,13 @@ public class DistributTrancHandler extends ChannelInboundHandlerAdapter  {
     /** 读取客户端传递过来的数据 */
     @Override
     public synchronized void channelRead(ChannelHandlerContext ctx , Object msg ){
-        System.out.println( "server ------------------接收数据：" + msg.toString());
-        JSONObject jsonObject = JSON.parseObject( (String)msg );
+        System.out.println( "server channelRead------------------接收数据1：" + msg.toString());
+        JSONObject jsonObject = JSON.parseObject( msg.toString() );
+        System.out.println( "server channelRead------------------接收数据2：");
         //create 创建事务组 ，add添加事务
-        String command = jsonObject.getString( "command" );
+        String command = jsonObject.getString( "commond" );
         String groupId = jsonObject.getString( "groupId" );
+        System.out.println( "server channelRead------------------接收数据3");
         //子事务类型： commit -待提交 ， rollback -待回滚
         String transactionType = jsonObject.getString( "transactionType" );
         //事务数量
@@ -53,37 +59,67 @@ public class DistributTrancHandler extends ChannelInboundHandlerAdapter  {
 
         if( "create".equals( command )){
             //创建事务组
+            System.out.println( "创建事务组时的groupId是：" + groupId );
             transactionTypeMap.put( groupId , new ArrayList<>());
         }else if( "add".equals( command )){
-            transactionTypeMap.get( groupId ).add( transactionType);
+            List<String > list = transactionTypeMap.get( groupId );
+            if( null == list ){
+                list = new ArrayList<>();
+            }
+            list.add( transactionType );
+            transactionTypeMap.put( groupId , list );
             if ( isEnd ){
                 isEndMap.put( groupId , true );
-                transactionCountMap.put( groupId , transactionCount );
+                transactionCountMap.put( groupId , transactionCount != null? transactionCount:1 );
             }
 
             JSONObject result = new JSONObject();
             result.put( "groupId" ,groupId );
             //如果已经接收到事务结束事务的标记，比较事务是否已经全部到达 ，如果已经全部到达看是否需要回滚
-            if( isEndMap.get( groupId ) &&
-                    transactionCountMap.get( groupId ).equals( transactionTypeMap.get( groupId).size())){
-                if( transactionTypeMap.get( groupId).contains( "rollback" )){
+            System.out.println( "isEndMap.get( groupId ):"+ isEndMap.get(groupId ));
+            System.out.println( "transactionCountMap.get( groupId ):"+ transactionCountMap.get( groupId ));
+            System.out.println( "transactionTypeMap.get( groupId).size():"+ list.size());
+            System.out.println( "transactionTypeMap.get( groupId):"+ list );
+
+            if( isEndMap.get( groupId ) ){
+
+//                    &&transactionCountMap.get( groupId ).equals( list.size())){
+                if( list.contains( "rollback" )){
                     result.put( "command" ,"rollback" );
                 }else{
                     result.put( "command" ,"commit" );
                 }
                 sendResult( result );
             }
-
+            System.out.println( "回滚数据是--------------：" + result );
         }
-
     }
-
     private void sendResult( JSONObject result ){
+        System.out.println( "回滚channelGroup是--------------：" + channelGroup );
         for(Channel channel :channelGroup ){
             System.out.println( "发送数据" );
             channel.writeAndFlush( result.toJSONString() );
         }
     }
+    @Override
+    public boolean acceptInboundMessage( Object msg) throws  Exception{
+        System.out.println( "server acceptInboundMessage------------------接收数据：" + msg.toString());
+
+        return true;
+    }
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        System.out.println("---------------server exception ------------------");
+        cause.printStackTrace();
+        ctx.close();
+    }
+    @Override
+    protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
+        System.out.println( "server channelRead0------------------接收数据：" +  msg.toString() );
+
+    }
+
+
 
 
     //注册
