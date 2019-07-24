@@ -77,7 +77,7 @@ public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
             System.out.println( "-------事务的数量----："+list.size() );
             Integer num = transactionCountMap.get( groupId );
             Boolean isEndBoolean = isEndMap.get( groupId );
-            if( null != isEndBoolean && ( null != num && num ==  list.size() ) ){
+            if( null != isEndBoolean && isEndBoolean && ( null != num && num ==  list.size() ) ){
                 if( list.contains( "rollback" )){
                     result.put( "command" ,"rollback" );
                     sendResult( result , null );
