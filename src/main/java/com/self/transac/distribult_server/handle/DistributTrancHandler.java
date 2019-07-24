@@ -75,8 +75,9 @@ public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
             //如果已经接收到事务结束事务的标记，比较事务是否已经全部到达 ，如果已经全部到达看是否需要回滚
             System.out.println( "-------事务已提交的数量-----："+transactionCountMap.get( groupId ) );
             System.out.println( "-------事务的数量----："+list.size() );
-
-            if( isEndMap.get( groupId ) &&transactionCountMap.get( groupId ).equals( list.size()) ){
+            Integer num = transactionCountMap.get( groupId );
+            Boolean isEndBoolean = isEndMap.get( groupId );
+            if( null != isEndBoolean && ( null != num && num ==  list.size() ) ){
                 if( list.contains( "rollback" )){
                     result.put( "command" ,"rollback" );
                     sendResult( result , null );
@@ -87,6 +88,8 @@ public class DistributTrancHandler extends SimpleChannelInboundHandler<String> {
                 }
 
             }
+            result.put( "command" ,"add" );
+            sendResult( result ,ctx.channel() );
             System.out.println( "事务IP:" + ctx.channel().remoteAddress() + ",数据是--------------：" + result );
         }
     }
